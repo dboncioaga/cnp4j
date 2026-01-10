@@ -7,7 +7,7 @@ import io.github.dboncioaga.cnp4j.internal.ValidationResult;
 
 import java.time.LocalDate;
 import java.time.Period;
-import java.util.HashMap;
+import java.time.DateTimeException;
 import java.util.Map;
 
 /**
@@ -16,9 +16,14 @@ import java.util.Map;
  * <p>This class is package-private and contains the core validation and extraction
  * algorithms. It is used internally by {@link CnpValidator} and {@link CnpUtils}.
  *
+ * <p>Note: this utility class contains multiple small helpers by design. We suppress
+ * the PMD TooManyMethods rule because splitting these helpers into separate classes
+ * would add unnecessary indirection for this focused implementation.
+ *
  * @author Daniel Boncioaga
  * @since 0.1.0
  */
+@SuppressWarnings("PMD.TooManyMethods")
 public final class CnpEngine {
 
     /**
@@ -34,61 +39,57 @@ public final class CnpEngine {
     /**
      * County codes mapping.
      */
-    private static final Map<Integer, String> COUNTY_CODES;
-
-    static {
-        final Map<Integer, String> map = new HashMap<>();
-        map.put(1, "Alba");
-        map.put(2, "Arad");
-        map.put(3, "Argeș");
-        map.put(4, "Bacău");
-        map.put(5, "Bihor");
-        map.put(6, "Bistrița-Năsăud");
-        map.put(7, "Botoșani");
-        map.put(8, "Brașov");
-        map.put(9, "Brăila");
-        map.put(10, "Buzău");
-        map.put(11, "Caraș-Severin");
-        map.put(12, "Cluj");
-        map.put(13, "Constanța");
-        map.put(14, "Covasna");
-        map.put(15, "Dâmbovița");
-        map.put(16, "Dolj");
-        map.put(17, "Galați");
-        map.put(18, "Gorj");
-        map.put(19, "Harghita");
-        map.put(20, "Hunedoara");
-        map.put(21, "Ialomița");
-        map.put(22, "Iași");
-        map.put(23, "Ilfov");
-        map.put(24, "Maramureș");
-        map.put(25, "Mehedinți");
-        map.put(26, "Mureș");
-        map.put(27, "Neamț");
-        map.put(28, "Olt");
-        map.put(29, "Prahova");
-        map.put(30, "Sălaj");
-        map.put(31, "Satu Mare");
-        map.put(32, "Sibiu");
-        map.put(33, "Suceava");
-        map.put(34, "Teleorman");
-        map.put(35, "Timiș");
-        map.put(36, "Tulcea");
-        map.put(37, "Vaslui");
-        map.put(38, "Vâlcea");
-        map.put(39, "Vrancea");
-        map.put(40, "București");
-        map.put(41, "București - Sector 1");
-        map.put(42, "București - Sector 2");
-        map.put(43, "București - Sector 3");
-        map.put(44, "București - Sector 4");
-        map.put(45, "București - Sector 5");
-        map.put(46, "București - Sector 6");
-        map.put(51, "Călărași");
-        map.put(52, "Giurgiu");
-        map.put(70, "Sistem Informatic Integrat (SII)");
-        COUNTY_CODES = Map.copyOf(map);
-    }
+    private static final Map<Integer, String> COUNTY_CODES = Map.ofEntries(
+            Map.entry(1, "Alba"),
+            Map.entry(2, "Arad"),
+            Map.entry(3, "Argeș"),
+            Map.entry(4, "Bacău"),
+            Map.entry(5, "Bihor"),
+            Map.entry(6, "Bistrița-Năsăud"),
+            Map.entry(7, "Botoșani"),
+            Map.entry(8, "Brașov"),
+            Map.entry(9, "Brăila"),
+            Map.entry(10, "Buzău"),
+            Map.entry(11, "Caraș-Severin"),
+            Map.entry(12, "Cluj"),
+            Map.entry(13, "Constanța"),
+            Map.entry(14, "Covasna"),
+            Map.entry(15, "Dâmbovița"),
+            Map.entry(16, "Dolj"),
+            Map.entry(17, "Galați"),
+            Map.entry(18, "Gorj"),
+            Map.entry(19, "Harghita"),
+            Map.entry(20, "Hunedoara"),
+            Map.entry(21, "Ialomița"),
+            Map.entry(22, "Iași"),
+            Map.entry(23, "Ilfov"),
+            Map.entry(24, "Maramureș"),
+            Map.entry(25, "Mehedinți"),
+            Map.entry(26, "Mureș"),
+            Map.entry(27, "Neamț"),
+            Map.entry(28, "Olt"),
+            Map.entry(29, "Prahova"),
+            Map.entry(30, "Sălaj"),
+            Map.entry(31, "Satu Mare"),
+            Map.entry(32, "Sibiu"),
+            Map.entry(33, "Suceava"),
+            Map.entry(34, "Teleorman"),
+            Map.entry(35, "Timiș"),
+            Map.entry(36, "Tulcea"),
+            Map.entry(37, "Vaslui"),
+            Map.entry(38, "Vâlcea"),
+            Map.entry(39, "Vrancea"),
+            Map.entry(40, "București"),
+            Map.entry(41, "București - Sector 1"),
+            Map.entry(42, "București - Sector 2"),
+            Map.entry(43, "București - Sector 3"),
+            Map.entry(44, "București - Sector 4"),
+            Map.entry(45, "București - Sector 5"),
+            Map.entry(46, "București - Sector 6"),
+            Map.entry(51, "Călărași"),
+            Map.entry(52, "Giurgiu"),
+            Map.entry(70, "N/A")
+    );
 
     /**
      * <p>Private constructor to prevent instantiation.
@@ -127,77 +128,31 @@ public final class CnpEngine {
      *         never null
      */
     public static ValidationResult validate(final String cnp) {
-        if (cnp == null) {
-            return ValidationResult.invalid(new CnpError(CnpError.NULL_CNP));
+        // Basic null/length/numeric checks
+        CnpError err = checkNullLengthNumeric(cnp);
+        if (err != null) {
+            return ValidationResult.invalid(err);
         }
 
-        if (cnp.length() != CNP_LENGTH) {
-            return ValidationResult.invalid(new CnpError(CnpError.INVALID_LENGTH));
+        // S, month, day checks
+        err = checkSDigitMonthDay(cnp);
+        if (err != null) {
+            return ValidationResult.invalid(err);
         }
 
-        if (!cnp.matches("\\d+")) {
-            return ValidationResult.invalid(new CnpError(CnpError.NON_NUMERIC));
+        // Check digit
+        err = checkCheckDigit(cnp);
+        if (err != null) {
+            return ValidationResult.invalid(err);
         }
 
-        final int s = Character.getNumericValue(cnp.charAt(0));
-        if (s < 1 || s > 8) {
-            return ValidationResult.invalid(new CnpError(CnpError.INVALID_S));
-        }
-
-        final int month = Integer.parseInt(cnp.substring(3, 5));
-        if (month < 1 || month > 12) {
-            return ValidationResult.invalid(new CnpError(CnpError.INVALID_MONTH));
-        }
-
-        final int day = Integer.parseInt(cnp.substring(5, 7));
-        if (day < 1 || day > 31) {
-            return ValidationResult.invalid(new CnpError(CnpError.INVALID_DAY));
-        }
-
-        final int calculated = calculateCheckDigit(cnp);
-        final int provided = Character.getNumericValue(cnp.charAt(12));
-        if (calculated != provided) {
-            return ValidationResult.invalid(new CnpError(CnpError.BAD_CHECK_DIGIT));
-        }
-
-        final int year = Integer.parseInt(cnp.substring(1, 3));
-        final int century;
-        if (s == 1 || s == 2) {
-            century = 1900;
-        } else if (s == 3 || s == 4) {
-            century = 1800;
-        } else if (s == 5 || s == 6) {
-            century = 2000;
-        } else {
-            century = 2000;
-        }
-
-        final int fullYear = century + year;
-        try {
-            LocalDate.of(fullYear, month, day);
-        } catch (final Exception e) {
-            return ValidationResult.invalid(new CnpError(CnpError.INVALID_DATE));
+        // Date validity
+        err = checkDateValidity(cnp);
+        if (err != null) {
+            return ValidationResult.invalid(err);
         }
 
         return ValidationResult.valid();
-    }
-
-    /**
-     * <p>Calculates the check digit for a CNP string.
-     *
-     * <p>The check digit is calculated using a weighted sum of the first 12 digits.
-     * If the remainder is 10, the check digit is set to 1.
-     *
-     * @param cnp the CNP string, must not be null and must be at least 12 characters
-     * @return the calculated check digit (0-9)
-     */
-    private static int calculateCheckDigit(final String cnp) {
-        int sum = 0;
-        for (int i = 0; i < 12; i++) {
-            sum += Character.getNumericValue(cnp.charAt(i)) * CHECK_DIGIT_WEIGHTS[i];
-        }
-        final int rem = sum % 11;
-        return (rem < 10) ? rem : 1;
     }
 
     /**
@@ -226,18 +181,7 @@ public final class CnpEngine {
         final int month = Integer.parseInt(cnp.substring(3, 5));
         final int day = Integer.parseInt(cnp.substring(5, 7));
 
-        final int century;
-        if (s == 1 || s == 2) {
-            century = 1900;
-        } else if (s == 3 || s == 4) {
-            century = 1800;
-        } else if (s == 5 || s == 6) {
-            century = 2000;
-        } else {
-            century = 2000;
-        }
-
-        return LocalDate.of(century + year, month, day);
+        return LocalDate.of(getCentury(s) + year, month, day);
     }
 
     /**
@@ -281,18 +225,14 @@ public final class CnpEngine {
             return null;
         }
 
-        try {
-            return Integer.parseInt(cnp.substring(7, 9));
-        } catch (final Exception e) {
-            return null;
-        }
+        return Integer.parseInt(cnp.substring(7, 9));
     }
 
     /**
      * <p>Extracts the county name from a valid CNP string.
      *
      * <p>Returns the county name based on the county code (JJ) in the CNP.
-     * For the special code 70, returns "Sistem Informatic Integrat (SII)".
+     * For the special code 70, returns "N/A".
      *
      * <p>Returns {@code null} if the CNP is invalid, null, or if the county code
      * is not recognized.
@@ -328,5 +268,99 @@ public final class CnpEngine {
         }
 
         return Period.between(dob, LocalDate.now()).getYears();
+    }
+
+    // Helper: basic checks
+    private static CnpError checkNullLengthNumeric(final String cnp) {
+        if (cnp == null) {
+            return new CnpError(CnpError.NULL_CNP);
+        }
+        if (cnp.length() != CNP_LENGTH) {
+            return new CnpError(CnpError.INVALID_LENGTH);
+        }
+        if (!cnp.matches("\\d+")) {
+            return new CnpError(CnpError.NON_NUMERIC);
+        }
+        return null;
+    }
+
+    // Helper: S digit, month and day checks
+    private static CnpError checkSDigitMonthDay(final String cnp) {
+        final int s = Character.getNumericValue(cnp.charAt(0));
+        if (s < 1 || s > 8) {
+            return new CnpError(CnpError.INVALID_S);
+        }
+
+        final int month = Integer.parseInt(cnp.substring(3, 5));
+        if (month < 1 || month > 12) {
+            return new CnpError(CnpError.INVALID_MONTH);
+        }
+
+        final int day = Integer.parseInt(cnp.substring(5, 7));
+        if (day < 1 || day > 31) {
+            return new CnpError(CnpError.INVALID_DAY);
+        }
+
+        return null;
+    }
+
+    // Helper: check digit
+    private static CnpError checkCheckDigit(final String cnp) {
+        final int calculated = calculateCheckDigit(cnp);
+        final int provided = Character.getNumericValue(cnp.charAt(12));
+        if (calculated != provided) {
+            return new CnpError(CnpError.BAD_CHECK_DIGIT);
+        }
+        return null;
+    }
+
+    // Helper: date validity
+    private static CnpError checkDateValidity(final String cnp) {
+        final int s = Character.getNumericValue(cnp.charAt(0));
+        final int year = Integer.parseInt(cnp.substring(1, 3));
+        final int month = Integer.parseInt(cnp.substring(3, 5));
+        final int day = Integer.parseInt(cnp.substring(5, 7));
+
+        final int fullYear = getCentury(s) + year;
+        try {
+            LocalDate.of(fullYear, month, day);
+        } catch (final DateTimeException e) {
+            return new CnpError(CnpError.INVALID_DATE);
+        }
+        return null;
+    }
+
+    /**
+     * <p>Calculates the check digit for a CNP string.
+     *
+     * <p>The check digit is calculated using a weighted sum of the first 12 digits.
+     * If the remainder is 10, the check digit is set to 1.
+     *
+     * @param cnp the CNP string, must not be null and must be at least 12 characters
+     * @return the calculated check digit (0-9)
+     */
+    private static int calculateCheckDigit(final String cnp) {
+        int sum = 0;
+        for (int i = 0; i < 12; i++) {
+            sum += Character.getNumericValue(cnp.charAt(i)) * CHECK_DIGIT_WEIGHTS[i];
+        }
+        final int rem = sum % 11;
+        return (rem < 10) ? rem : 1;
+    }
+
+    /**
+     * <p>Determines the century based on the S digit.
+     *
+     * @param s the S digit (first digit of CNP)
+     * @return the century (1800, 1900, or 2000)
+     */
+    private static int getCentury(final int s) {
+        if (s == 1 || s == 2) {
+            return 1900;
+        } else if (s == 3 || s == 4) {
+            return 1800;
+        } else {
+            return 2000;
+        }
     }
 }

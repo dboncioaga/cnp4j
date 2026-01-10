@@ -122,7 +122,7 @@ class CnpUtilsTest {
         String siiCnp = CnpGenerator.generate(5, 20, 1, 1, 70, 119);
         String county = CnpUtils.getCounty(siiCnp);
         assertNotNull(county);
-        assertEquals("Sistem Informatic Integrat (SII)", county);
+        assertEquals("N/A", county);
     }
 
     @Test

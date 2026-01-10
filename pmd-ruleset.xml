@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<ruleset name="CNP4J Custom Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset/2.0.0.xsd">
+
+    <description>Custom PMD ruleset for CNP4J project</description>
+
+    <!-- <rule ref="category/java/codestyle.xml"/> Ignore codestyle rules since we have checksyle plugin enabled -->
+
+
+    <!-- Include all standard rulesets -->
+    <rule ref="category/java/bestpractices.xml"/>
+    <rule ref="category/java/design.xml">
+        <exclude name="LoosePackageCoupling"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml"/>
+    <rule ref="category/java/performance.xml"/>
+    <rule ref="category/java/security.xml"/>
+
+</ruleset>

@@ -112,7 +112,7 @@ public final class CnpUtils {
      * <p>Extracts the county name from a CNP string.
      *
      * <p>Returns the county name based on the county code (JJ) in the CNP.
-     * For the special code 70, returns "Sistem Informatic Integrat (SII)".
+     * For the special code 70, returns "N/A".
      *
      * <p>Returns {@code null} if the CNP is invalid, null, or if the county code
      * is not recognized.

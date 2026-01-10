@@ -133,7 +133,7 @@ class CnpValidatorTest {
         CnpValidator validator = new CnpValidator(siiCnp);
         String county = validator.getCounty();
         assertNotNull(county);
-        assertEquals("Sistem Informatic Integrat (SII)", county);
+        assertEquals("N/A", county);
     }
 
     @Test
