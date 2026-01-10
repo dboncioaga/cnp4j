@@ -97,8 +97,7 @@ jobs:
             sudo apt-get install -y gh
           fi
 
-          # authenticate and create release
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          # create release using the token supplied in the environment (no gh auth login)
           gh release create "$TAG" --title "$TITLE" --notes-file release_notes.txt --target main || gh release upload "$TAG" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
