@@ -14,7 +14,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,26 +57,8 @@ jobs:
       - name: Update pom.xml version
         run: |
           RELEASE_VERSION="${{ steps.release_version.outputs.release_version }}"
-          # Update the project version using Python for cross-platform compatibility
-          python3 -c "
-          import re
-          import sys
-          
-          release_version = sys.argv[1]
-          
-          with open('pom.xml', 'r') as f:
-              content = f.read()
-          
-          # Replace the project version (first <version> tag after <artifactId>cnp4j</artifactId>)
-          pattern = r'(<artifactId>cnp4j</artifactId>\s*<version>)([^<]+)(</version>)'
-          replacement = r'\1' + release_version + r'\3'
-          content = re.sub(pattern, replacement, content)
-          
-          with open('pom.xml', 'w') as f:
-              f.write(content)
-          
-          print(f'Updated pom.xml to version: {release_version}')
-          " "$RELEASE_VERSION"
+          # Use Maven Versions plugin to update the project version (no backup files)
+          mvn --batch-mode versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 
       - name: Verify pom.xml update
         run: |
@@ -91,26 +73,33 @@ jobs:
       - name: Commit version change
         run: |
           git add pom.xml
-          git commit -m "Release version ${{ steps.release_version.outputs.release_version }}"
+          git commit -m "Release version ${{ steps.release_version.outputs.release_version }}" || echo "No changes to commit"
           git push origin main
 
       - name: Create and push tag
         run: |
           TAG="v${{ steps.release_version.outputs.release_version }}"
-          git tag -a "$TAG" -m "Release ${{ steps.release_version.outputs.release_version }}"
-          git push origin "$TAG"
+          git tag -a "$TAG" -m "Release ${{ steps.release_version.outputs.release_version }}" || echo "Tag exists"
+          git push origin "$TAG" || echo "Tag push failed or tag exists"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.release_version.outputs.release_version }}
-          name: Release ${{ steps.release_version.outputs.release_version }}
-          body: |
-            ## Release ${{ steps.release_version.outputs.release_version }}
-            
-            This release was automatically created from the main branch.
-          draft: false
-          prerelease: false
+      - name: Create GitHub Release (gh)
+        run: |
+          TAG="v${{ steps.release_version.outputs.release_version }}"
+          TITLE="Release ${{ steps.release_version.outputs.release_version }}"
+          RELEASE="${{ steps.release_version.outputs.release_version }}"
+
+          # create a minimal notes file safely
+          printf "## Release %s\n\nThis release was automatically created from the main branch.\n" "$RELEASE" > release_notes.txt
+
+          # install gh if missing
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y gh
+          fi
+
+          # authenticate and create release
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh release create "$TAG" --title "$TITLE" --notes-file release_notes.txt --target main || gh release upload "$TAG" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
