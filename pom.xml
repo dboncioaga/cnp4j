@@ -43,7 +43,7 @@
         <jspecify.version>1.0.0</jspecify.version>
         <junit.version>5.11.0</junit.version>
         <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
-        <maven.surefire.plugin.version>3.5.1</maven.surefire.plugin.version>
+        <maven.surefire.plugin.version>3.5.4</maven.surefire.plugin.version>
         <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
         <maven.javadoc.plugin.version>3.7.0</maven.javadoc.plugin.version>
         <maven.gpg.plugin.version>3.2.1</maven.gpg.plugin.version>
