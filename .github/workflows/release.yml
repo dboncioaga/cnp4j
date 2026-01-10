@@ -58,23 +58,25 @@ jobs:
         run: |
           RELEASE_VERSION="${{ steps.release_version.outputs.release_version }}"
           # Update the project version using Python for cross-platform compatibility
-          python3 << EOF
+          python3 -c "
           import re
           import sys
+          
+          release_version = sys.argv[1]
           
           with open('pom.xml', 'r') as f:
               content = f.read()
           
           # Replace the project version (first <version> tag after <artifactId>cnp4j</artifactId>)
           pattern = r'(<artifactId>cnp4j</artifactId>\s*<version>)([^<]+)(</version>)'
-          replacement = r'\1' + sys.argv[1] + r'\3'
+          replacement = r'\1' + release_version + r'\3'
           content = re.sub(pattern, replacement, content)
           
           with open('pom.xml', 'w') as f:
               f.write(content)
           
-          print(f"Updated pom.xml to version: {sys.argv[1]}")
-          EOF "$RELEASE_VERSION"
+          print(f'Updated pom.xml to version: {release_version}')
+          " "$RELEASE_VERSION"
 
       - name: Verify pom.xml update
         run: |
