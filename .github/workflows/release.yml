@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0). If not provided, will remove -SNAPSHOT from current version.'
+        required: false
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Read current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Determine release version
+        id: release_version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            RELEASE_VERSION="${{ inputs.version }}"
+          else
+            CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
+            RELEASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-SNAPSHOT//')
+          fi
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $RELEASE_VERSION"
+
+      - name: Update pom.xml version
+        run: |
+          RELEASE_VERSION="${{ steps.release_version.outputs.release_version }}"
+          # Update the project version using Python for cross-platform compatibility
+          python3 << EOF
+          import re
+          import sys
+          
+          with open('pom.xml', 'r') as f:
+              content = f.read()
+          
+          # Replace the project version (first <version> tag after <artifactId>cnp4j</artifactId>)
+          pattern = r'(<artifactId>cnp4j</artifactId>\s*<version>)([^<]+)(</version>)'
+          replacement = r'\1' + sys.argv[1] + r'\3'
+          content = re.sub(pattern, replacement, content)
+          
+          with open('pom.xml', 'w') as f:
+              f.write(content)
+          
+          print(f"Updated pom.xml to version: {sys.argv[1]}")
+          EOF "$RELEASE_VERSION"
+
+      - name: Verify pom.xml update
+        run: |
+          NEW_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          EXPECTED_VERSION="${{ steps.release_version.outputs.release_version }}"
+          if [ "$NEW_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Error: Version mismatch. Expected: $EXPECTED_VERSION, Got: $NEW_VERSION"
+            exit 1
+          fi
+          echo "Verified pom.xml version: $NEW_VERSION"
+
+      - name: Commit version change
+        run: |
+          git add pom.xml
+          git commit -m "Release version ${{ steps.release_version.outputs.release_version }}"
+          git push origin main
+
+      - name: Create and push tag
+        run: |
+          TAG="v${{ steps.release_version.outputs.release_version }}"
+          git tag -a "$TAG" -m "Release ${{ steps.release_version.outputs.release_version }}"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.release_version.outputs.release_version }}
+          name: Release ${{ steps.release_version.outputs.release_version }}
+          body: |
+            ## Release ${{ steps.release_version.outputs.release_version }}
+            
+            This release was automatically created from the main branch.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure GPG
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
+          gpg --list-secret-keys --keyid-format LONG
+
+      - name: Configure Maven settings
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>central</id>
+                <username>${{ secrets.MAVEN_CENTRAL_USERNAME }}</username>
+                <password>${{ secrets.MAVEN_CENTRAL_PASSWORD }}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>gpg</id>
+                <properties>
+                  <gpg.executable>gpg</gpg.executable>
+                  <gpg.passphrase>${{ secrets.GPG_PASSPHRASE }}</gpg.passphrase>
+                </properties>
+              </profile>
+            </profiles>
+          </settings>
+          EOF
+
+      - name: Build and publish to Maven Central
+        run: mvn clean deploy -P gpg
+        env:
+          GPG_TTY: $(tty)
