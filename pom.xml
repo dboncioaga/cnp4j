@@ -50,7 +50,7 @@
         <central.publishing.plugin.version>0.9.0</central.publishing.plugin.version>
         <maven.checkstyle.plugin.version>3.6.0</maven.checkstyle.plugin.version>
         <maven.pmd.plugin.version>3.26.0</maven.pmd.plugin.version>
-        <checkstyle.version>10.15.0</checkstyle.version>
+        <checkstyle.version>13.0.0</checkstyle.version>
         <pmd.version>7.20.0</pmd.version>
     </properties>
 
